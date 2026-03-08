@@ -1,0 +1,116 @@
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul class="flashes">
+    {% for m in messages %}
+      <li>{{ m }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+
+<div class="page-container">
+  <form id="attend-form" method="post" enctype="multipart/form-data">
+    <label>Venue:
+      <select name="venue_id" required>
+        {% for v in venues %}
+          <option value="{{ v.id }}" data-boundary="{{ v.boundary }}">{{ v.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Course:
+      <select name="course_id" required {% if preselected_course_id %}disabled{% endif %}>
+        {% for c in courses %}
+          <option value="{{ c.id }}"
+            {% if preselected_course_id == c.id %}selected{% endif %}>
+            {{ c.name }}{% if c.department %} ({{ c.department }}){% endif %}
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+    <input placeholder="email" name="email" required>
+    <input placeholder="full name" name="name" required>
+    <input placeholder="8-digit index" name="index" required>
+    <input type="file" name="selfie" accept="image/*" capture="user" required>
+    <small>If the camera doesn't open, please select or take a photo manually.<br>
+       Mobile devices usually offer a camera option when tapping this field.</small>
+    <input type="hidden" name="latitude">
+    <input type="hidden" name="longitude">
+    <button type="submit">Submit</button>
+  </form>
+
+  <div id="location-status" style="margin-top:.5em;font-weight:bold"></div>
+</div>
+
+<script>
+const form = document.getElementById('attend-form');
+const latInput = form.querySelector('input[name=latitude]');
+const lngInput = form.querySelector('input[name=longitude]');
+const status = document.getElementById('location-status');
+
+function haversine(lat1, lng1, lat2, lng2) {
+  const toRad = x => x * Math.PI / 180;
+  const R = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lng2 - lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function checkLocation(callback) {
+  const venueOpt = document.querySelector('select[name=venue_id] option:checked');
+  const boundaryRaw = venueOpt?.dataset.boundary;
+  if (!boundaryRaw) {
+    status.textContent = 'Select a venue first.';
+    return callback(false);
+  }
+
+  const boundary = JSON.parse(boundaryRaw);
+
+  if (!navigator.geolocation) {
+    status.textContent = 'Geolocation not supported.';
+    return callback(false);
+  }
+
+  status.textContent = 'Getting location…';
+  navigator.geolocation.getCurrentPosition(p => {
+    latInput.value = p.coords.latitude;
+    lngInput.value = p.coords.longitude;
+
+    let inside = false;
+    if (boundary && boundary.center && boundary.radius != null) {
+      const [clng, clat] = boundary.center;
+      inside = haversine(p.coords.latitude, p.coords.longitude, clat, clng) <= Number(boundary.radius);
+    }
+
+    status.textContent = inside
+      ? '✅ You are inside the perimeter.'
+      : '❌ You are outside the perimeter.';
+    callback(inside);
+  }, e => {
+    status.textContent = 'Unable to get location: ' + e.message;
+    callback(false);
+  }, {
+    enableHighAccuracy: true,
+    maximumAge: 0,
+    timeout: 15000
+  });
+}
+
+form.addEventListener('submit', e => {
+  if (latInput.value && lngInput.value) return;
+  e.preventDefault();
+  checkLocation(inside => {
+    if (inside) form.submit();
+  });
+});
+
+document.querySelector('select[name=venue_id]').addEventListener('change', () => {
+  latInput.value = '';
+  lngInput.value = '';
+  checkLocation(() => {});
+});
+</script>
+
+{% if preselected_course_id %}
+  <input type="hidden" name="course_id" value="{{ preselected_course_id }}">
+{% endif %}

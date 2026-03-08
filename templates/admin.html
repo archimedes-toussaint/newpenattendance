@@ -1,0 +1,123 @@
+<div class="page-container">
+  <h1>Admin</h1>
+
+
+  <h2>Add venue</h2>
+  <form method="post" id="venue-form">
+    <input name="venue_name" placeholder="Venue name" required>
+    <div>
+      <button type="button" id="set-center">Set center (use GPS)</button>
+      <button type="button" id="clear-center">Clear</button>
+    </div>
+    <div id="center-info"><em>center not set</em></div>
+    <label>
+      Radius (meters):
+      <input type="number" name="radius" value="15" min="1" required>
+    </label>
+    <input type="hidden" name="boundary" id="boundary">
+    <button type="submit">Add</button>
+  </form>
+
+  <script>
+  let center = null;
+  const centerInfo = document.getElementById('center-info');
+  const boundaryInput = document.getElementById('boundary');
+
+  function updateCenterInfo() {
+    if (!center) {
+      centerInfo.textContent = 'center not set';
+      boundaryInput.value = '';
+      return;
+    }
+    centerInfo.textContent = 'center: ' + center[1].toFixed(6) + ', ' + center[0].toFixed(6);
+    boundaryInput.value = JSON.stringify({ center, radius: parseFloat(document.querySelector('input[name=radius]').value) });
+  }
+
+  document.getElementById('set-center').addEventListener('click', () => {
+    if (!navigator.geolocation) return alert('Geolocation not supported');
+    navigator.geolocation.getCurrentPosition(p => {
+      center = [p.coords.longitude, p.coords.latitude];
+      updateCenterInfo();
+    }, e => alert('Unable to get location: ' + e.message), { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+  });
+
+  document.getElementById('clear-center').addEventListener('click', () => {
+    center = null;
+    updateCenterInfo();
+  });
+
+  document.querySelector('input[name=radius]').addEventListener('input', updateCenterInfo);
+  </script>
+
+  <h2>Add course</h2>
+  <form method="post">
+    <input name="course_name" placeholder="Course name" required>
+    <input name="department" placeholder="Department" required>
+    <select name="venue_id" required>
+      <option value="">Select venue</option>
+      {% for v in venues %}
+        <option value="{{ v.id }}">{{ v.name }}</option>
+      {% endfor %}
+    </select>
+    <input name="lecture_time" placeholder="Lecture time (e.g. 10:00-11:00)">
+    <input name="lecture_number" placeholder="Lecture number (e.g. 3rd, 4th)">
+    <button type="submit">Add course</button>
+  </form>
+
+  <h2>Existing venues</h2>
+  <ul>
+  {% for v in venues %}
+    <li>
+      {{ v.name }} – {{ v.boundary }}
+      <form method="post" action="{{ url_for('delete_venue', venue_id=v.id) }}" style="display:inline">
+        <button type="submit">Delete</button>
+      </form>
+    </li>
+  {% endfor %}
+  </ul>
+
+  <h2>Courses</h2>
+  <ul>
+  {% for c in courses %}
+    <li>
+      {{ c.name }} ({{ c.lecture_number }})
+      {% if c.active %}[active]{% else %}[inactive]{% endif %}
+      <div>
+        <a href="{{ url_for('attend_token', token=c.access_token, _external=True) }}" target="_blank">
+          {{ url_for('attend_token', token=c.access_token, _external=True) }}
+        </a>
+        <br>
+        <img src="{{ url_for('course_qrcode', course_id=c.id) }}" alt="QR code" style="width:120px;height:120px;margin-top:5px">
+        <br>
+        <button onclick="window.open('{{ url_for('course_qrcode', course_id=c.id) }}', '_blank')" type="button">Project QR</button>
+        <br>
+        <small>Scan to open attendance link</small>
+        <br>
+        <a href="{{ url_for('download_course_attendance', course_id=c.id) }}">Download attendance for this course</a>
+      </div>
+      <form method="post" action="{{ url_for('toggle_course_active', course_id=c.id) }}" style="display:inline">
+        <button type="submit">
+          {{ 'Deactivate' if c.active else 'Activate' }}
+        </button>
+      </form>
+      <form method="post" action="{{ url_for('delete_course', course_id=c.id) }}" style="display:inline">
+        <button type="submit">Delete</button>
+      </form>
+    </li>
+  {% endfor %}
+  </ul>
+
+  <p>
+    <a href="{{ url_for('attendance_list') }}">View attendance records</a> |
+    <a href="{{ url_for('download_attendance') }}">Download attendance CSV</a>
+  </p>
+
+  <h2>Uploaded selfies</h2>
+  <ul>
+  {% for fn in selfies %}
+    <li><a href="/{{ fn }}">{{ fn }}</a></li>
+  {% else %}
+    <li><em>none yet</em></li>
+  {% endfor %}
+  </ul>
+</div>

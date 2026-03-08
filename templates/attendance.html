@@ -1,0 +1,25 @@
+<h1>Attendance Records</h1>
+<p><a href="{{ url_for('admin') }}">Back to admin</a></p>
+<table border="1" cellpadding="4">
+  <tr>
+    <th>ID</th><th>Email</th><th>Name</th><th>Index</th>
+    <th>Course</th><th>Venue</th><th>Time</th><th>Lecture</th>
+    <th>Lat</th><th>Lng</th><th>Selfie</th>
+  </tr>
+{% for r in records %}
+  <tr>
+    <td>{{ r.id }}</td>
+    <td>{{ r.email }}</td>
+    <td>{{ r.name }}</td>
+    <td>{{ r.index_number }}</td>
+    <td>{{ r.course.name if r.course }}</td>
+    <td>{{ r.course.venue.name if r.course and r.course.venue }}</td>
+    <td>{{ r.venue.name if r.venue }}</td>
+    <td>{{ r.course.lecture_time if r.course }}</td>
+    <td>{{ r.course.lecture_number if r.course }}</td>
+    <td>{{ r.latitude }}</td>
+    <td>{{ r.longitude }}</td>
+    <td>{% if r.selfie %}<a href="/{{ r.selfie }}">view</a>{% endif %}</td>
+  </tr>
+{% endfor %}
+</table>
